@@ -1,0 +1,41 @@
+# Unity generated
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Build output
+/[Bb]uild/
+/[Bb]uilds/
+
+# IDE / generated project files
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Crash reports / OS
+sysinfo.txt
+crashlytics-build.properties
+.DS_Store
+Thumbs.db
+
+# Burst build artifacts
+/Data/

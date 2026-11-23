@@ -102,12 +102,18 @@ namespace RealMolkky.Tests
         [Test]
         public void SwipeSpeedError_ChangesThrowSpeedOnlyALittle()
         {
-            // スワイプの速さが10%ずれても、初速のずれは3%程度に収まる
+            // スワイプの速さが10%ずれても、初速のずれは3%未満
             float r = _t.referenceSwipeSpeed;
             float a = SwipeThrowMapper.ThrowSpeed(r, ThrowStyle.Vertical, _t);
             float b = SwipeThrowMapper.ThrowSpeed(r * 1.1f, ThrowStyle.Vertical, _t);
             Assert.Greater(b, a);
-            Assert.Less((b - a) / a, 0.035f);
+            Assert.Less((b - a) / a, 0.03f);
+
+            // 2倍・半分の速さでも、初速の変化は speedPerDoubling だけ
+            float fast = SwipeThrowMapper.ThrowSpeed(r * 2f, ThrowStyle.Vertical, _t);
+            float slow = SwipeThrowMapper.ThrowSpeed(r * 0.5f, ThrowStyle.Vertical, _t);
+            Assert.That(fast - a, Is.EqualTo(_t.speedPerDoubling).Within(1e-3f));
+            Assert.That(a - slow, Is.EqualTo(_t.speedPerDoubling).Within(1e-3f));
         }
 
         [Test]
@@ -116,7 +122,7 @@ namespace RealMolkky.Tests
             Map(new Vector2(0f, 100f), ThrowStyle.Horizontal, 0f, _t, out var p);
             Assert.That(p.speed, Is.EqualTo(_t.maxThrowSpeed));
             var t = _t.Clone();
-            t.speedPerSwipe = 10f;
+            t.speedPerDoubling = 10f;
             Map(new Vector2(0f, t.minSwipeSpeed), ThrowStyle.Vertical, 0f, t, out p);
             Assert.That(p.speed, Is.EqualTo(t.minThrowSpeed));
         }
@@ -172,6 +178,28 @@ namespace RealMolkky.Tests
             t.faceTarget = false;
             Map(new Vector2(0f, 2f), ThrowStyle.Vertical, -0.5f, t, out p);
             Assert.That(p.yawDeg, Is.EqualTo(0f).Within(1e-4f));
+        }
+    }
+
+    public class TuningSerializationTests
+    {
+        /// <summary>
+        /// 調整値がシーンに保存されると、古い値がコードの初期値より優先されて直した値が効かなくなる
+        /// （実際に公開版で起きた）。保存されないことを確かめる。
+        /// </summary>
+        [Test]
+        public void TuningFields_AreNotSavedInScenes()
+        {
+            var fields = new[]
+            {
+                typeof(RealMolkky.Play.ThrowController).GetField("tuning"),
+                typeof(MolkkyRig).GetField("tuning"),
+            };
+            foreach (var f in fields)
+            {
+                Assert.IsNotNull(f);
+                Assert.IsTrue(f.IsNotSerialized, $"{f.DeclaringType.Name}.{f.Name} is serialized");
+            }
         }
     }
 

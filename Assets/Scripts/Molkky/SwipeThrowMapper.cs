@@ -26,7 +26,7 @@ namespace RealMolkky.Molkky
             return Mathf.Atan2(PinsCenter.x - lateral, dz) * Mathf.Rad2Deg;
         }
 
-        /// <param name="releaseVelocity">離す直前の画面上の速度（短辺/秒、上が +y）。力に使う</param>
+        /// <param name="releaseVelocity">離す直前の画面上の速度（kpx/s、上が +y）。力に使う</param>
         /// <param name="stroke">スワイプ全体の動き（<see cref="SwipeTracker.StrokeVector"/>）。向きに使う。
         /// ゼロなら離す直前の速度の向きを使う</param>
         public static SwipeReject TryMap(Vector2 releaseVelocity, Vector2 stroke, ThrowStyle style, float lateral,
@@ -61,13 +61,15 @@ namespace RealMolkky.Molkky
         }
 
         /// <summary>
-        /// スワイプの速さ → 初速。基準の速さで基準の初速になり、そこからのずれは小さめに効かせる
-        /// （速さの比例にすると、スワイプの速さが数%ずれるだけで届く距離が大きく変わるため）。
+        /// スワイプの速さ → 初速。基準の速さで基準の初速になり、そこからは速さの倍率で小さめに効かせる。
+        /// 速さに比例させると、スワイプが数%ずれるだけで届く距離が大きく変わり、
+        /// 手の速さの個人差や端末の差で極端に飛びすぎたり届かなかったりするため。
         /// </summary>
         public static float ThrowSpeed(float swipeSpeed, ThrowStyle style, ThrowControlTuning t)
         {
             float baseSpeed = style == ThrowStyle.Vertical ? t.verticalBaseSpeed : t.horizontalBaseSpeed;
-            float v = baseSpeed + (swipeSpeed - t.referenceSwipeSpeed) * t.speedPerSwipe;
+            float ratio = Mathf.Max(swipeSpeed, 1e-4f) / Mathf.Max(t.referenceSwipeSpeed, 1e-4f);
+            float v = baseSpeed + Mathf.Log(ratio, 2f) * t.speedPerDoubling;
             return Mathf.Clamp(v, t.minThrowSpeed, t.maxThrowSpeed);
         }
 

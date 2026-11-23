@@ -5,7 +5,8 @@ namespace RealMolkky.Molkky
 {
     /// <summary>
     /// 投げる操作の調整値。フェーズ2で実機を触りながら決める。
-    /// スワイプの速さの単位は「画面の短い辺 / 秒」（端末の解像度に左右されないように）。
+    /// スワイプの速さの単位は「1000 CSSピクセル / 秒」（kpx/s）。CSSピクセルは端末によらず
+    /// だいたい同じ物理的な長さなので、スマホとPCで同じ手の速さがほぼ同じ値になる。
     /// </summary>
     [Serializable]
     public class ThrowControlTuning
@@ -13,21 +14,21 @@ namespace RealMolkky.Molkky
         [Header("スワイプ")]
         [Tooltip("指を離す直前のこの秒数の動きから速さを求める（向きはスワイプ全体から求める）")]
         public float swipeWindow = 0.1f;
-        [Tooltip("これより遅いスワイプは投げない（短辺/秒）")]
-        public float minSwipeSpeed = 0.4f;
+        [Tooltip("これより遅いスワイプは投げない（kpx/s）")]
+        public float minSwipeSpeed = 0.3f;
         [Tooltip("真上からこの角度を超えて横に向いたスワイプは投げない（度）")]
         public float maxSwipeAngle = 60f;
 
         [Header("力")]
-        [Tooltip("基準のスワイプの速さ（短辺/秒）。この速さで投げると下の基準の初速になる")]
+        [Tooltip("基準のスワイプの速さ（kpx/s）。この速さで投げると下の基準の初速になる")]
         public float referenceSwipeSpeed = 2.0f;
         [Tooltip("縦投げの基準の初速 m/s（ピンの並びに届く強さ）")]
         public float verticalBaseSpeed = 6.0f;
         [Tooltip("横投げの基準の初速 m/s。今の芝の材質では転がって当たっても倒れにくいので、低く飛んで当たる強さにしている")]
         public float horizontalBaseSpeed = 6.0f;
-        [Tooltip("スワイプの速さが基準から 1短辺/秒 ずれたときに初速が変わる量 m/s。" +
-                 "小さいほどスワイプの速さのばらつきに強い")]
-        public float speedPerSwipe = 0.8f;
+        [Tooltip("スワイプの速さが2倍になったときに初速が増える量 m/s（半分なら同じだけ減る）。" +
+                 "倍率で効かせるので、基準が手の速さと多少ずれても極端に飛びすぎたり届かなかったりしない")]
+        public float speedPerDoubling = 0.8f;
         [Tooltip("初速の下限 m/s")]
         public float minThrowSpeed = 2.5f;
         [Tooltip("初速の上限 m/s")]

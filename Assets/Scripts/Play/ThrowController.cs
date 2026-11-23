@@ -22,7 +22,9 @@ namespace RealMolkky.Play
             Settled,
         }
 
-        public ThrowControlTuning tuning = new ThrowControlTuning();
+        // 調整値はシーンに保存しない（保存すると古い値がコードの初期値より優先され、直したはずの値が効かなくなる）。
+        // 実行中は画面の Tuning から変える
+        [NonSerialized] public ThrowControlTuning tuning = new ThrowControlTuning();
 
         [SerializeField] MolkkyRig rig;
         [SerializeField] ThrowSimulator simulator;
@@ -205,7 +207,8 @@ namespace RealMolkky.Play
 
         void Release()
         {
-            float unit = Mathf.Max(1f, Mathf.Min(Screen.width, Screen.height));
+            // 画面のピクセル → 1000 CSSピクセル（端末によらずだいたい同じ物理的な長さ）
+            float unit = 1000f * ScreenScale.PixelsPerCssPixel;
             var vel = _tracker.VelocityAtEnd(tuning.swipeWindow) / unit;
             var stroke = _tracker.StrokeVector() / unit;
             LastSwipeVelocity = vel;

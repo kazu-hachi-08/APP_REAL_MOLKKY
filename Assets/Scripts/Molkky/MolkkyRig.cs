@@ -8,7 +8,9 @@ namespace RealMolkky.Molkky
     /// </summary>
     public class MolkkyRig : MonoBehaviour
     {
-        public PhysicsTuning tuning = new PhysicsTuning();
+        // 調整値はシーンに保存しない（保存すると古い値がコードの初期値より優先され、直したはずの値が効かなくなる）。
+        // 実行中は画面の Tuning から変える
+        [System.NonSerialized] public PhysicsTuning tuning = new PhysicsTuning();
 
         [SerializeField] Rigidbody stick;
         [SerializeField] Rigidbody[] pins = new Rigidbody[MolkkySpec.PinCount]; // [0] = 1番

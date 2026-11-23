@@ -169,7 +169,7 @@ namespace RealMolkky.DebugTools
                 var v = controller.LastSwipeVelocity;
                 if (v != Vector2.zero)
                 {
-                    sb.AppendLine($"Swipe {v.magnitude:F2}/s  angle {SwipeThrowMapper.SwipeAngleDeg(v):+0.0;-0.0}deg" +
+                    sb.AppendLine($"Swipe {v.magnitude:F2}/s  angle {SwipeThrowMapper.SwipeAngleDeg(controller.LastSwipeStroke):+0.0;-0.0}deg" +
                                   (controller.LastReject != SwipeReject.None ? $"  -> {controller.LastReject}" : ""));
                 }
                 if (controller.ThrowCount > 0)
@@ -241,7 +241,10 @@ namespace RealMolkky.DebugTools
             GUILayout.Label("Swipe", _label);
             t.swipeWindow = Slider("Window s", t.swipeWindow, 0.03f, 0.3f, "F2");
             t.minSwipeSpeed = Slider("Min swipe", t.minSwipeSpeed, 0.05f, 2f, "F2");
-            t.speedPerSwipe = Slider("Speed/swipe", t.speedPerSwipe, 0.5f, 6f, "F2");
+            t.referenceSwipeSpeed = Slider("Ref swipe", t.referenceSwipeSpeed, 0.5f, 5f, "F2");
+            t.verticalBaseSpeed = Slider("Base spd V", t.verticalBaseSpeed, 2f, 9f, "F2");
+            t.horizontalBaseSpeed = Slider("Base spd H", t.horizontalBaseSpeed, 2f, 9f, "F2");
+            t.speedPerSwipe = Slider("Spd/swipe", t.speedPerSwipe, 0f, 4f, "F2");
             t.maxThrowSpeed = Slider("Max speed", t.maxThrowSpeed, 3f, 14f, "F1");
             t.yawPerSwipeDeg = Slider("Yaw/angle", t.yawPerSwipeDeg, 0f, 1f, "F2");
             t.maxYawDeg = Slider("Max yaw", t.maxYawDeg, 1f, 30f, "F1");
@@ -250,8 +253,8 @@ namespace RealMolkky.DebugTools
             GUILayout.Label("Throw", _label);
             t.verticalElevationDeg = Slider("Elev V", t.verticalElevationDeg, 0f, 45f, "F1");
             t.horizontalElevationDeg = Slider("Elev H", t.horizontalElevationDeg, 0f, 45f, "F1");
-            t.verticalSpinPerSpeed = Slider("Spin/spd V", t.verticalSpinPerSpeed, -3f, 3f, "F2");
-            t.horizontalSpinPerSpeed = Slider("Spin/spd H", t.horizontalSpinPerSpeed, -3f, 3f, "F2");
+            t.verticalSpinPerSpeed = Slider("Spin/spd V", t.verticalSpinPerSpeed, -2f, 2f, "F2");
+            t.horizontalSpinPerSpeed = Slider("Spin/spd H", t.horizontalSpinPerSpeed, -2f, 2f, "F2");
             t.releaseHeight = Slider("Release h", t.releaseHeight, 0.2f, 1.2f, "F2");
 
             GUILayout.Label("Stance / camera", _label);

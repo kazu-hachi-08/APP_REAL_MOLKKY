@@ -22,7 +22,7 @@ namespace RealMolkky.Molkky
         [Tooltip("初速 m/s")] public float speed;
         [Tooltip("仰角 度")] public float elevationDeg;
         [Tooltip("左右の向き 度（+で右）")] public float yawDeg;
-        [Tooltip("回転 rad/s（縦投げは前回り、横投げは水平回り）")] public float spin;
+        [Tooltip("回転 rad/s（投げる向きに直交する水平軸回り、+で前回り）")] public float spin;
         [Tooltip("投げる位置（投げるラインからの左右）")] public float lateral;
         [Tooltip("手を離す高さ m")] public float releaseHeight;
         [Tooltip("投げるラインから手を離す位置までの前方距離 m")] public float releaseForward;
@@ -68,6 +68,9 @@ namespace RealMolkky.Molkky
 
         float _accum;
         float _slowTimer;
+        float _stableTimer;
+        readonly Vector3[] _snapPos = new Vector3[MolkkySpec.BodyCount];
+        readonly Quaternion[] _snapRot = new Quaternion[MolkkySpec.BodyCount];
         double _stepMsTotal;
         readonly Stopwatch _sw = new Stopwatch();
 
@@ -99,10 +102,10 @@ namespace RealMolkky.Molkky
             float el = p.elevationDeg * Mathf.Deg2Rad;
             velocity = yaw * new Vector3(0f, Mathf.Sin(el), Mathf.Cos(el)) * p.speed;
 
-            // 縦投げ: 上端が前に倒れる向き（+X軸回り）。横投げ: 鉛直軸回り
-            angularVelocity = p.style == ThrowStyle.Vertical
-                ? yaw * Vector3.right * p.spin
-                : Vector3.up * p.spin;
+            // どちらも投げる向きに直交する水平軸回り（+で前回り）。
+            // 縦投げは縦に回り、横投げは寝かせた棒が長い軸のまわりに転がるように回る。
+            // 鉛直軸回り（ヘリコプター状）にすると、着地で回転が横向きの動きに変わり大きく曲がる
+            angularVelocity = yaw * Vector3.right * p.spin;
         }
 
         public void Throw(in ThrowParams p)
@@ -121,6 +124,7 @@ namespace RealMolkky.Molkky
             StepCount = 0;
             _accum = 0f;
             _slowTimer = 0f;
+            TakeSnapshot();
             _stepMsTotal = 0;
             AvgStepMs = 0f;
             MaxStepMs = 0f;
@@ -179,7 +183,11 @@ namespace RealMolkky.Molkky
             bool slow = lin < t.stopLinearSpeed && ang < t.stopAngularSpeed;
             _slowTimer = slow ? _slowTimer + dt : 0f;
 
-            bool stopped = SimTime > 0.2f && _slowTimer >= t.stopHoldTime;
+            // 止まった判定その2: 速さが閾値近くで揺れていても、位置と向きがほとんど変わらない状態が続く
+            if (MovedSinceSnapshot(t)) TakeSnapshot();
+            else _stableTimer += dt;
+
+            bool stopped = SimTime > 0.2f && (_slowTimer >= t.stopHoldTime || _stableTimer >= t.stopStableTime);
             bool timeout = SimTime >= t.simulationTimeout;
             if (stopped || timeout) Finish(timeout);
         }
@@ -193,6 +201,7 @@ namespace RealMolkky.Molkky
             }
 
             LastTimedOut = timedOut;
+            if (timedOut) Debug.LogWarning("[ThrowSimulator] Timeout. Still moving: " + DescribeMovingBodies());
             LastFallenPins = MolkkyScoring.FallenPins(LastRecord);
             LastScore = MolkkyScoring.ThrowScore(LastFallenPins);
             CurrentState = State.Finished;
@@ -200,6 +209,47 @@ namespace RealMolkky.Molkky
             Debug.Log($"[ThrowSimulator] {(timedOut ? "Timeout" : "Stopped")} t={SimTime:F2}s steps={StepCount} " +
                       $"avg={AvgStepMs:F2}ms max={MaxStepMs:F2}ms fallen=[{string.Join(",", LastFallenPins)}] score={LastScore}");
             Finished?.Invoke(LastRecord);
+        }
+
+        void TakeSnapshot()
+        {
+            for (int i = 0; i < MolkkySpec.BodyCount; i++)
+            {
+                var tr = rig.GetBody(i).transform;
+                _snapPos[i] = tr.position;
+                _snapRot[i] = tr.rotation;
+            }
+            _stableTimer = 0f;
+        }
+
+        bool MovedSinceSnapshot(PhysicsTuning t)
+        {
+            for (int i = 0; i < MolkkySpec.BodyCount; i++)
+            {
+                var rb = rig.GetBody(i);
+                if (rb.isKinematic) continue; // 手に持った棒・場外に落ちた物
+                var tr = rb.transform;
+                if ((tr.position - _snapPos[i]).sqrMagnitude > t.stopMoveTolerance * t.stopMoveTolerance) return true;
+                if (Quaternion.Angle(tr.rotation, _snapRot[i]) > t.stopRotateToleranceDeg) return true;
+            }
+            return false;
+        }
+
+        /// <summary>止まった判定の閾値を超えて動いている物（打ち切りの原因の調査用）</summary>
+        string DescribeMovingBodies()
+        {
+            var t = rig.tuning;
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < MolkkySpec.BodyCount; i++)
+            {
+                var rb = rig.GetBody(i);
+                if (rb.isKinematic || rb.IsSleeping()) continue;
+                float lin = rb.linearVelocity.magnitude, ang = rb.angularVelocity.magnitude;
+                if (lin < t.stopLinearSpeed && ang < t.stopAngularSpeed) continue;
+                sb.Append(i == MolkkySpec.StickBodyIndex ? "stick" : $"pin{i}");
+                sb.Append($"(v={lin:F3} w={ang:F2} pos={rb.position}) ");
+            }
+            return sb.Length == 0 ? "none" : sb.ToString();
         }
 
         /// <summary>テストやエディタ用: 止まるまで一気に計算する</summary>

@@ -2,6 +2,7 @@ using System;
 using RealMolkky.Molkky;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 
 namespace RealMolkky.Play
 {
@@ -35,6 +36,7 @@ namespace RealMolkky.Play
 
         // 直前のスワイプ（調整用の表示）
         public Vector2 LastSwipeVelocity { get; private set; }
+        public Vector2 LastSwipeStroke { get; private set; }
         public SwipeReject LastReject { get; private set; }
         public ThrowParams LastParams { get; private set; }
 
@@ -46,12 +48,32 @@ namespace RealMolkky.Play
 
         readonly SwipeTracker _tracker = new SwipeTracker();
         float _settledTimer;
+        Pointer _trackingPointer;
+        bool _eventSampleSinceUpdate;
 
         public void Bind(MolkkyRig r, ThrowSimulator s, ThrowCamera c)
         {
             rig = r;
             simulator = s;
             throwCamera = c;
+        }
+
+        void OnEnable() => InputSystem.onEvent += OnInputEvent;
+        void OnDisable() => InputSystem.onEvent -= OnInputEvent;
+
+        /// <summary>
+        /// 指（マウス）の動きを入力イベントごとに、イベントの時刻つきで記録する。
+        /// 画面の更新ごとに読むと、描画が一瞬止まったときに「時間は進んだのに動いていない」ことになり、
+        /// 速さ（＝力）を低く読んでしまうため。
+        /// </summary>
+        void OnInputEvent(InputEventPtr e, InputDevice device)
+        {
+            if (!_tracker.IsTracking || device != _trackingPointer) return;
+            if (!e.IsA<StateEvent>() && !e.IsA<DeltaStateEvent>()) return;
+            // タッチ画面はイベントの形式が違って読めないことがある。その場合は Update で読む
+            if (!_trackingPointer.position.ReadValueFromEvent(e, out var pos)) return;
+            _tracker.Add(e.time, pos);
+            _eventSampleSinceUpdate = true;
         }
 
         void Start()
@@ -65,6 +87,7 @@ namespace RealMolkky.Play
         public void ResetPins()
         {
             _tracker.Cancel();
+            _trackingPointer = null;
             simulator.ResetPins();
             EnterAiming();
         }
@@ -143,33 +166,40 @@ namespace RealMolkky.Play
 
         void HandlePointer()
         {
-            var pointer = Pointer.current;
-            if (pointer == null)
+            var pointer = _tracker.IsTracking ? _trackingPointer : Pointer.current;
+            if (pointer == null || !pointer.added)
             {
                 _tracker.Cancel();
+                _trackingPointer = null;
                 return;
             }
 
-            double now = Time.unscaledTimeAsDouble;
+            // 入力イベントと同じ時間軸の現在時刻
+            double now = InputState.currentTime;
             var pos = pointer.position.ReadValue();
             var press = pointer.press;
+            bool gotEvents = _eventSampleSinceUpdate;
+            _eventSampleSinceUpdate = false;
 
             if (!_tracker.IsTracking)
             {
                 if (press.wasPressedThisFrame && CurrentState == State.Aiming && !(IsOverUI?.Invoke(pos) ?? false))
                 {
                     _tracker.Begin(now, pos);
+                    _trackingPointer = pointer;
                 }
                 return;
             }
 
             if (press.isPressed && !press.wasReleasedThisFrame)
             {
-                _tracker.Add(now, pos);
+                // イベントから読めなかったときだけ、ここで位置を足す
+                if (!gotEvents && pos != _tracker.LastPosition) _tracker.Add(now, pos);
                 return;
             }
 
             _tracker.End(now, pos);
+            _trackingPointer = null;
             Release();
         }
 
@@ -177,8 +207,10 @@ namespace RealMolkky.Play
         {
             float unit = Mathf.Max(1f, Mathf.Min(Screen.width, Screen.height));
             var vel = _tracker.VelocityAtEnd(tuning.swipeWindow) / unit;
+            var stroke = _tracker.StrokeVector() / unit;
             LastSwipeVelocity = vel;
-            LastReject = SwipeThrowMapper.TryMap(vel, Style, Lateral, tuning, out var p);
+            LastSwipeStroke = stroke;
+            LastReject = SwipeThrowMapper.TryMap(vel, stroke, Style, Lateral, tuning, out var p);
             if (LastReject != SwipeReject.None || CurrentState != State.Aiming) return;
 
             LastParams = p;

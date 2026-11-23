@@ -47,12 +47,32 @@ namespace RealMolkky.Tests
         }
 
         [Test]
+        public void Stroke_IgnoresWindUp_AndIsStraighterThanTheEnd()
+        {
+            // 先に少し下へ引き、まっすぐ上へ動かして、最後だけ右へ曲がる（親指の弧）
+            var tr = new SwipeTracker();
+            tr.Begin(0.0, new Vector2(0f, 0f));
+            tr.Add(0.05, new Vector2(-10f, -30f)); // 引き（含めない）
+            for (int i = 1; i <= 10; i++) tr.Add(0.05 + i / 60.0, new Vector2(-10f, -30f + i * 30f));
+            tr.Add(0.25, new Vector2(10f, 290f));  // 最後に右へ
+            tr.End(0.26, new Vector2(30f, 320f));
+
+            var stroke = tr.StrokeVector();
+            Assert.That(stroke.x, Is.EqualTo(40f).Within(1e-3f));
+            Assert.That(stroke.y, Is.EqualTo(350f).Within(1e-3f));
+            // 離す直前だけ見ると大きく右に向いている
+            var v = tr.VelocityAtEnd(0.03f);
+            Assert.Greater(SwipeThrowMapper.SwipeAngleDeg(v), 2f * SwipeThrowMapper.SwipeAngleDeg(stroke));
+        }
+
+        [Test]
         public void SingleSample_IsZero()
         {
             var tr = new SwipeTracker();
             tr.Begin(0.0, Vector2.one);
             tr.End(0.0, Vector2.one);
             Assert.AreEqual(Vector2.zero, tr.VelocityAtEnd(0.1f));
+            Assert.AreEqual(Vector2.zero, tr.StrokeVector());
         }
     }
 
@@ -60,29 +80,51 @@ namespace RealMolkky.Tests
     {
         readonly ThrowControlTuning _t = new ThrowControlTuning();
 
+        static SwipeReject Map(Vector2 v, ThrowStyle style, float lateral, ThrowControlTuning t, out ThrowParams p)
+            => SwipeThrowMapper.TryMap(v, v, style, lateral, t, out p);
+
         [Test]
-        public void StraightSwipe_ThrowsStraightWithScaledSpeed()
+        public void ReferenceSwipe_GivesBaseSpeed()
         {
-            var r = SwipeThrowMapper.TryMap(new Vector2(0f, 2f), ThrowStyle.Vertical, 0f, _t, out var p);
-            Assert.AreEqual(SwipeReject.None, r);
-            Assert.That(p.speed, Is.EqualTo(2f * _t.speedPerSwipe).Within(1e-4f));
+            var v = new Vector2(0f, _t.referenceSwipeSpeed);
+            Assert.AreEqual(SwipeReject.None, Map(v, ThrowStyle.Vertical, 0f, _t, out var p));
+            Assert.That(p.speed, Is.EqualTo(_t.verticalBaseSpeed).Within(1e-4f));
             Assert.That(p.yawDeg, Is.EqualTo(0f).Within(1e-4f));
             Assert.AreEqual(ThrowStyle.Vertical, p.style);
             Assert.That(p.elevationDeg, Is.EqualTo(_t.verticalElevationDeg));
+            Assert.That(p.spin, Is.EqualTo(p.speed * _t.verticalSpinPerSpeed).Within(1e-4f));
+
+            Map(v, ThrowStyle.Horizontal, 0f, _t, out p);
+            Assert.That(p.speed, Is.EqualTo(_t.horizontalBaseSpeed).Within(1e-4f));
+            Assert.That(p.elevationDeg, Is.EqualTo(_t.horizontalElevationDeg));
         }
 
         [Test]
-        public void Speed_IsCapped()
+        public void SwipeSpeedError_ChangesThrowSpeedOnlyALittle()
         {
-            SwipeThrowMapper.TryMap(new Vector2(0f, 100f), ThrowStyle.Horizontal, 0f, _t, out var p);
+            // スワイプの速さが10%ずれても、初速のずれは3%程度に収まる
+            float r = _t.referenceSwipeSpeed;
+            float a = SwipeThrowMapper.ThrowSpeed(r, ThrowStyle.Vertical, _t);
+            float b = SwipeThrowMapper.ThrowSpeed(r * 1.1f, ThrowStyle.Vertical, _t);
+            Assert.Greater(b, a);
+            Assert.Less((b - a) / a, 0.035f);
+        }
+
+        [Test]
+        public void Speed_IsClamped()
+        {
+            Map(new Vector2(0f, 100f), ThrowStyle.Horizontal, 0f, _t, out var p);
             Assert.That(p.speed, Is.EqualTo(_t.maxThrowSpeed));
-            Assert.That(p.elevationDeg, Is.EqualTo(_t.horizontalElevationDeg));
+            var t = _t.Clone();
+            t.speedPerSwipe = 10f;
+            Map(new Vector2(0f, t.minSwipeSpeed), ThrowStyle.Vertical, 0f, t, out p);
+            Assert.That(p.speed, Is.EqualTo(t.minThrowSpeed));
         }
 
         [Test]
         public void SwipeToTheRight_AimsRight_AndIsCapped()
         {
-            SwipeThrowMapper.TryMap(new Vector2(1f, 2f), ThrowStyle.Vertical, 0f, _t, out var p);
+            Map(new Vector2(1f, 2f), ThrowStyle.Vertical, 0f, _t, out var p);
             Assert.Greater(p.yawDeg, 0f);
             float angle = Mathf.Atan2(1f, 2f) * Mathf.Rad2Deg;
             Assert.That(p.yawDeg, Is.EqualTo(Mathf.Min(angle * _t.yawPerSwipeDeg, _t.maxYawDeg)).Within(1e-3f));
@@ -90,23 +132,34 @@ namespace RealMolkky.Tests
             var t = _t.Clone();
             t.yawPerSwipeDeg = 1f;
             t.maxYawDeg = 5f;
-            SwipeThrowMapper.TryMap(new Vector2(-1f, 1f), ThrowStyle.Vertical, 0f, t, out p);
+            Map(new Vector2(-1f, 1f), ThrowStyle.Vertical, 0f, t, out p);
             Assert.That(p.yawDeg, Is.EqualTo(-5f).Within(1e-4f));
+        }
+
+        [Test]
+        public void Direction_ComesFromStroke_PowerFromReleaseVelocity()
+        {
+            // 離す直前は右へ曲がっていても、スワイプ全体がまっすぐならまっすぐ投げる
+            var release = new Vector2(1f, 2f);
+            var stroke = new Vector2(0f, 0.5f);
+            SwipeThrowMapper.TryMap(release, stroke, ThrowStyle.Vertical, 0f, _t, out var p);
+            Assert.That(p.yawDeg, Is.EqualTo(0f).Within(1e-4f));
+            Assert.That(p.speed, Is.EqualTo(SwipeThrowMapper.ThrowSpeed(release.magnitude, ThrowStyle.Vertical, _t)).Within(1e-4f));
         }
 
         [Test]
         public void BadSwipes_AreRejected()
         {
-            Assert.AreEqual(SwipeReject.TooSlow, SwipeThrowMapper.TryMap(new Vector2(0f, 0.1f), ThrowStyle.Vertical, 0f, _t, out _));
-            Assert.AreEqual(SwipeReject.NotForward, SwipeThrowMapper.TryMap(new Vector2(0f, -2f), ThrowStyle.Vertical, 0f, _t, out _));
-            Assert.AreEqual(SwipeReject.TooSideways, SwipeThrowMapper.TryMap(new Vector2(2f, 0.3f), ThrowStyle.Vertical, 0f, _t, out _));
+            Assert.AreEqual(SwipeReject.TooSlow, Map(new Vector2(0f, 0.1f), ThrowStyle.Vertical, 0f, _t, out _));
+            Assert.AreEqual(SwipeReject.NotForward, Map(new Vector2(0f, -2f), ThrowStyle.Vertical, 0f, _t, out _));
+            Assert.AreEqual(SwipeReject.TooSideways, Map(new Vector2(2f, 0.3f), ThrowStyle.Vertical, 0f, _t, out _));
         }
 
         [Test]
         public void Stance_FacesPins()
         {
             // 左に立つと、まっすぐのスワイプはピンの方（右）へ向く
-            SwipeThrowMapper.TryMap(new Vector2(0f, 2f), ThrowStyle.Vertical, -0.5f, _t, out var p);
+            Map(new Vector2(0f, 2f), ThrowStyle.Vertical, -0.5f, _t, out var p);
             Assert.That(p.lateral, Is.EqualTo(-0.5f));
             Assert.Greater(p.yawDeg, 0f);
 
@@ -117,7 +170,7 @@ namespace RealMolkky.Tests
 
             var t = _t.Clone();
             t.faceTarget = false;
-            SwipeThrowMapper.TryMap(new Vector2(0f, 2f), ThrowStyle.Vertical, -0.5f, t, out p);
+            Map(new Vector2(0f, 2f), ThrowStyle.Vertical, -0.5f, t, out p);
             Assert.That(p.yawDeg, Is.EqualTo(0f).Within(1e-4f));
         }
     }
@@ -177,38 +230,81 @@ namespace RealMolkky.Tests
             return go.AddComponent<Rigidbody>();
         }
 
+        static ThrowParams MapReference(ThrowStyle style, float lateral, float swipeScale = 1f)
+        {
+            var t = new ThrowControlTuning();
+            var v = new Vector2(0f, t.referenceSwipeSpeed * swipeScale);
+            Assert.AreEqual(SwipeReject.None, SwipeThrowMapper.TryMap(v, v, style, lateral, t, out var p));
+            return p;
+        }
+
         /// <summary>
-        /// 標準的なスワイプで、棒がピンの並びの方へ飛び、手前の列に届くこと。
+        /// 基準のスワイプで、棒がピンの並びの方へ飛び、手前の列に届くこと。
         /// 何本倒れるかは物理次第でばらつくので、ここでは届くかと向きだけを見る。
         /// </summary>
         [TestCase(ThrowStyle.Vertical, 0f)]
         [TestCase(ThrowStyle.Horizontal, 0f)]
         [TestCase(ThrowStyle.Vertical, -0.4f)]
         [TestCase(ThrowStyle.Horizontal, 0.4f)]
-        public void TypicalSwipe_ReachesPins(ThrowStyle style, float lateral)
+        public void ReferenceSwipe_ReachesPins(ThrowStyle style, float lateral)
         {
-            var t = new ThrowControlTuning();
-            // 短辺の2.4倍/秒 ≒ スマホで軽くはじく速さ
-            Assert.AreEqual(SwipeReject.None, SwipeThrowMapper.TryMap(new Vector2(0f, 2.4f), style, lateral, t, out var p));
+            var p = MapReference(style, lateral);
             _sim.Throw(p);
             _sim.RunToEnd();
             Assert.IsFalse(_sim.LastTimedOut);
 
-            // 手前の列の少し手前を棒の中心が通ったときの位置
+            // 棒がピンに届いた瞬間: 棒の中心が手前の列の少し手前を通ったか、どれかのピンが動き始めたとき
             const float frontZ = 3.42f;
             var rec = _sim.LastRecord;
-            Vector3? cross = null;
-            for (int f = 1; f < rec.FrameCount && cross == null; f++)
+            Vector3? reach = null;
+            for (int f = 1; f < rec.FrameCount && reach == null; f++)
             {
                 rec.GetPose(f, MolkkySpec.StickBodyIndex, out var sp, out _);
-                if (sp.z >= frontZ) cross = sp;
+                bool pinMoved = false;
+                for (int n = 1; n <= MolkkySpec.PinCount && !pinMoved; n++)
+                {
+                    rec.GetPose(f, n, out var pp, out _);
+                    pinMoved = Vector3.Distance(pp, MolkkySpec.InitialPinPosition(n)) > 0.005f;
+                }
+                if (sp.z >= frontZ || pinMoved) reach = sp;
             }
-            Debug.Log($"[{style}] lateral={lateral}: speed={p.speed:F2} yaw={p.yawDeg:F1} cross={cross} " +
+            Debug.Log($"[{style}] lateral={lateral}: speed={p.speed:F2} yaw={p.yawDeg:F1} reach={reach} " +
                       $"fallen=[{string.Join(",", _sim.LastFallenPins)}]");
 
-            Assert.IsTrue(cross.HasValue, "stick did not reach the pins");
-            Assert.That(cross.Value.x, Is.EqualTo(SwipeThrowMapper.PinsCenter.x).Within(0.08f), "not aimed at the pins");
-            Assert.Less(cross.Value.y, MolkkySpec.PinHeight + MolkkySpec.StickLength * 0.5f, "flew over the pins");
+            Assert.IsTrue(reach.HasValue, "stick did not reach the pins");
+            Assert.That(reach.Value.x, Is.EqualTo(SwipeThrowMapper.PinsCenter.x).Within(0.1f), "not aimed at the pins");
+            Assert.Less(reach.Value.y, MolkkySpec.PinHeight + MolkkySpec.StickLength * 0.5f, "flew over the pins");
+        }
+
+        /// <summary>
+        /// まっすぐ投げたら、ピンがなくても横に大きく曲がらないこと（回転のかけ方の確認）。
+        /// スワイプの速さを ±10% 変えても、止まる距離の差が小さいこと。
+        /// </summary>
+        [TestCase(ThrowStyle.Vertical)]
+        [TestCase(ThrowStyle.Horizontal)]
+        public void StraightThrow_StaysStraight_AndDistanceIsForgiving(ThrowStyle style)
+        {
+            // ピンをどけて棒だけにする
+            for (int n = 1; n <= MolkkySpec.PinCount; n++)
+            {
+                var b = _rig.GetBody(n);
+                b.isKinematic = true;
+                b.position = new Vector3(5f + n, 0f, -5f);
+                b.transform.position = b.position;
+            }
+            Physics.SyncTransforms();
+
+            var ends = new List<Vector3>();
+            foreach (float scale in new[] { 0.9f, 1f, 1.1f })
+            {
+                _sim.Throw(MapReference(style, 0f, scale));
+                _sim.RunToEnd();
+                ends.Add(_rig.GetBody(MolkkySpec.StickBodyIndex).position);
+            }
+            Debug.Log($"[{style}] straight ends: {string.Join(" ", ends)}");
+
+            foreach (var e in ends) Assert.Less(Mathf.Abs(e.x), 0.3f, $"curved sideways: {e}");
+            Assert.Less(ends[2].z - ends[0].z, 1.0f, "distance too sensitive to swipe speed");
         }
     }
 }

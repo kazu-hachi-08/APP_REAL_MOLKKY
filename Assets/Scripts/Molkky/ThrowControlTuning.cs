@@ -11,7 +11,7 @@ namespace RealMolkky.Molkky
     public class ThrowControlTuning
     {
         [Header("スワイプ")]
-        [Tooltip("指を離す直前のこの秒数の動きから速さと向きを求める")]
+        [Tooltip("指を離す直前のこの秒数の動きから速さを求める（向きはスワイプ全体から求める）")]
         public float swipeWindow = 0.1f;
         [Tooltip("これより遅いスワイプは投げない（短辺/秒）")]
         public float minSwipeSpeed = 0.4f;
@@ -19,16 +19,25 @@ namespace RealMolkky.Molkky
         public float maxSwipeAngle = 60f;
 
         [Header("力")]
-        [Tooltip("スワイプの速さ(短辺/秒) → 棒の初速(m/s) の倍率")]
-        public float speedPerSwipe = 2.5f;
+        [Tooltip("基準のスワイプの速さ（短辺/秒）。この速さで投げると下の基準の初速になる")]
+        public float referenceSwipeSpeed = 2.0f;
+        [Tooltip("縦投げの基準の初速 m/s（ピンの並びに届く強さ）")]
+        public float verticalBaseSpeed = 6.0f;
+        [Tooltip("横投げの基準の初速 m/s。今の芝の材質では転がって当たっても倒れにくいので、低く飛んで当たる強さにしている")]
+        public float horizontalBaseSpeed = 6.0f;
+        [Tooltip("スワイプの速さが基準から 1短辺/秒 ずれたときに初速が変わる量 m/s。" +
+                 "小さいほどスワイプの速さのばらつきに強い")]
+        public float speedPerSwipe = 0.8f;
+        [Tooltip("初速の下限 m/s")]
+        public float minThrowSpeed = 2.5f;
         [Tooltip("初速の上限 m/s")]
         public float maxThrowSpeed = 9f;
 
         [Header("向き")]
-        [Tooltip("スワイプの角度(度) → 投げる向き(度) の倍率")]
-        public float yawPerSwipeDeg = 0.35f;
+        [Tooltip("スワイプの角度(度) → 投げる向き(度) の倍率。小さいほどスワイプの向きのずれに強い")]
+        public float yawPerSwipeDeg = 0.15f;
         [Tooltip("投げる向きの上限（度）")]
-        public float maxYawDeg = 12f;
+        public float maxYawDeg = 8f;
         [Tooltip("立ち位置を動かしても、まっすぐのスワイプがピンの方へ向くようにする（カメラもピンを向く）")]
         public bool faceTarget = true;
 
@@ -37,10 +46,10 @@ namespace RealMolkky.Molkky
         public float verticalElevationDeg = 18f;
         [Tooltip("横投げの仰角（度）")]
         public float horizontalElevationDeg = 18f;
-        [Tooltip("縦投げの回転: 初速 1m/s あたり rad/s")]
-        public float verticalSpinPerSpeed = 1f;
-        [Tooltip("横投げの回転: 初速 1m/s あたり rad/s")]
-        public float horizontalSpinPerSpeed = 1f;
+        [Tooltip("縦投げの前回り: 初速 1m/s あたり rad/s。強すぎると着地の向きがばらばらになり横に跳ねる")]
+        public float verticalSpinPerSpeed = 0.5f;
+        [Tooltip("横投げの前回り（長い軸のまわり）: 初速 1m/s あたり rad/s。0 が一番まっすぐ転がる")]
+        public float horizontalSpinPerSpeed = 0f;
         [Tooltip("手を離す高さ m")]
         public float releaseHeight = 0.6f;
         [Tooltip("投げるラインから手を離す位置までの前方距離 m")]

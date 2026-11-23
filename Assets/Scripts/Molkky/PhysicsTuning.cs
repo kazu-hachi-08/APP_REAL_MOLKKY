@@ -49,6 +49,12 @@ namespace RealMolkky.Molkky
         public float stopAngularSpeed = 0.25f;
         [Tooltip("この秒数だけ遅い状態が続いたら止まったとみなす")]
         public float stopHoldTime = 0.4f;
+        [Tooltip("速さが閾値近くで揺れ続ける物があっても、この秒数のあいだ下の範囲しか動かなければ止まったとみなす")]
+        public float stopStableTime = 0.6f;
+        [Tooltip("止まったとみなす位置の変化の範囲 m")]
+        public float stopMoveTolerance = 0.003f;
+        [Tooltip("止まったとみなす向きの変化の範囲（度）")]
+        public float stopRotateToleranceDeg = 2f;
         [Tooltip("止まらないときの打ち切り時間（秒）")]
         public float simulationTimeout = 12f;
 

@@ -26,20 +26,24 @@ namespace RealMolkky.Molkky
             return Mathf.Atan2(PinsCenter.x - lateral, dz) * Mathf.Rad2Deg;
         }
 
-        /// <param name="swipeVelocity">画面上の速度（短辺/秒、上が +y）</param>
-        public static SwipeReject TryMap(Vector2 swipeVelocity, ThrowStyle style, float lateral,
+        /// <param name="releaseVelocity">離す直前の画面上の速度（短辺/秒、上が +y）。力に使う</param>
+        /// <param name="stroke">スワイプ全体の動き（<see cref="SwipeTracker.StrokeVector"/>）。向きに使う。
+        /// ゼロなら離す直前の速度の向きを使う</param>
+        public static SwipeReject TryMap(Vector2 releaseVelocity, Vector2 stroke, ThrowStyle style, float lateral,
             ThrowControlTuning t, out ThrowParams p)
         {
             p = default;
-            float swipeSpeed = swipeVelocity.magnitude;
+            float swipeSpeed = releaseVelocity.magnitude;
             if (swipeSpeed < t.minSwipeSpeed) return SwipeReject.TooSlow;
-            if (swipeVelocity.y <= 0f) return SwipeReject.NotForward;
+            if (releaseVelocity.y <= 0f) return SwipeReject.NotForward;
 
-            float angle = SwipeAngleDeg(swipeVelocity);
+            var dir = stroke.sqrMagnitude > 1e-8f ? stroke : releaseVelocity;
+            if (dir.y <= 0f) return SwipeReject.NotForward;
+            float angle = SwipeAngleDeg(dir);
             if (Mathf.Abs(angle) > t.maxSwipeAngle) return SwipeReject.TooSideways;
 
             bool vertical = style == ThrowStyle.Vertical;
-            float speed = Mathf.Min(swipeSpeed * t.speedPerSwipe, t.maxThrowSpeed);
+            float speed = ThrowSpeed(swipeSpeed, style, t);
             float yaw = Mathf.Clamp(angle * t.yawPerSwipeDeg, -t.maxYawDeg, t.maxYawDeg);
 
             p = new ThrowParams
@@ -54,6 +58,17 @@ namespace RealMolkky.Molkky
                 releaseForward = t.releaseForward,
             };
             return SwipeReject.None;
+        }
+
+        /// <summary>
+        /// スワイプの速さ → 初速。基準の速さで基準の初速になり、そこからのずれは小さめに効かせる
+        /// （速さの比例にすると、スワイプの速さが数%ずれるだけで届く距離が大きく変わるため）。
+        /// </summary>
+        public static float ThrowSpeed(float swipeSpeed, ThrowStyle style, ThrowControlTuning t)
+        {
+            float baseSpeed = style == ThrowStyle.Vertical ? t.verticalBaseSpeed : t.horizontalBaseSpeed;
+            float v = baseSpeed + (swipeSpeed - t.referenceSwipeSpeed) * t.speedPerSwipe;
+            return Mathf.Clamp(v, t.minThrowSpeed, t.maxThrowSpeed);
         }
 
         /// <summary>真上を0、右を+とした角度（度）</summary>

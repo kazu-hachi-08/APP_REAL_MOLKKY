@@ -8,8 +8,8 @@ namespace RealMolkky.Molkky
     /// </summary>
     public class SwipeTracker
     {
-        /// <summary>これより古いサンプルは捨てる（秒）</summary>
-        const double KeepSeconds = 1.0;
+        /// <summary>これより古いサンプルは捨てる（秒）。向きはスワイプ全体から求めるので長めに残す</summary>
+        const double KeepSeconds = 3.0;
 
         readonly List<(double t, Vector2 p)> _samples = new List<(double, Vector2)>();
 
@@ -55,6 +55,23 @@ namespace RealMolkky.Molkky
         {
             IsTracking = false;
             _samples.Clear();
+        }
+
+        /// <summary>
+        /// スワイプ全体の向き: 上に動き始めた点（一番下の点）から離した点まで。
+        /// 親指のスワイプは弧を描くので、離す直前の向きより安定する。
+        /// 先に下へ引いてから上へはじいた場合も、引いた分は含めない。
+        /// </summary>
+        public Vector2 StrokeVector()
+        {
+            int n = _samples.Count;
+            if (n < 2) return Vector2.zero;
+            int low = 0;
+            for (int i = 1; i < n; i++)
+            {
+                if (_samples[i].p.y < _samples[low].p.y) low = i;
+            }
+            return _samples[n - 1].p - _samples[low].p;
         }
 
         /// <summary>最後のサンプルから window 秒さかのぼった区間の平均速度（単位/秒）</summary>

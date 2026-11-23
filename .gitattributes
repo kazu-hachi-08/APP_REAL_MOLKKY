@@ -1,0 +1,35 @@
+# 改行コードは LF に統一する（Unity も LF で書き出すため）
+* text=auto eol=lf
+
+# Unity のテキストアセット
+*.unity    text eol=lf
+*.prefab   text eol=lf
+*.asset    text eol=lf
+*.mat      text eol=lf
+*.meta     text eol=lf
+*.anim     text eol=lf
+*.controller text eol=lf
+*.cs       text eol=lf
+*.asmdef   text eol=lf
+*.shader   text eol=lf
+*.md       text eol=lf
+*.ps1      text eol=lf
+
+# バイナリ
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.psd   binary
+*.tga   binary
+*.exr   binary
+*.hdr   binary
+*.fbx   binary
+*.obj   binary
+*.wav   binary
+*.mp3   binary
+*.ogg   binary
+*.ttf   binary
+*.otf   binary
+*.dll   binary
+*.so    binary
+*.unityweb binary

@@ -1,6 +1,7 @@
 using System.Text;
 using RealMolkky.Molkky;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace RealMolkky.DebugTools
 {
@@ -196,6 +197,7 @@ namespace RealMolkky.DebugTools
             }
             if (GUILayout.Button(_showLabels ? "Labels: on" : "Labels: off", _button, GUILayout.Height(30))) _showLabels = !_showLabels;
             GUILayout.EndHorizontal();
+            if (GUILayout.Button("Swipe throw (Phase 2)", _button, GUILayout.Height(30))) SceneManager.LoadScene("Phase2Throw");
 
             GUILayout.Space(4);
             throwParams.speed = Slider("Speed m/s", throwParams.speed, 1f, 10f, "F2");

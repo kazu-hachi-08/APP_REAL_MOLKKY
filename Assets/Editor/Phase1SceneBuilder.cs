@@ -16,10 +16,33 @@ public static class Phase1SceneBuilder
     const string MeshDir = "Assets/Meshes";
     const string MatDir = "Assets/Materials/Phase1";
 
+    /// <summary>シーンに置いた物理まわりの参照</summary>
+    public struct World
+    {
+        public GameObject root;
+        public MolkkyRig rig;
+        public ThrowSimulator simulator;
+        public ThrowPlayer player;
+        public Camera camera;
+    }
+
     [MenuItem("Build/Create Phase1 Sandbox Scene")]
     public static void Create()
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        var world = CreateWorld("Phase1Sandbox");
+        var ui = world.root.AddComponent<Phase1SandboxUI>();
+        ui.Bind(world.rig, world.simulator, world.player, world.camera);
+
+        EditorSceneManager.SaveScene(scene, ScenePath);
+        Phase2SceneBuilder.ApplyBuildScenes();
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[Phase1SceneBuilder] Created {ScenePath}");
+    }
+
+    /// <summary>光・地面・投げるライン・ピン・棒・カメラと、物理の部品を今のシーンに作る（フェーズ2でも使う）</summary>
+    public static World CreateWorld(string rootName)
+    {
 
         // 光（フェーズ0と同じ仮のもの）
         var lightGo = new GameObject("Sun");
@@ -91,20 +114,15 @@ public static class Phase1SceneBuilder
         camGo.transform.LookAt(new Vector3(0f, 0.05f, MolkkySpec.ThrowDistance + 0.08f));
 
         // 物理と記録
-        var sandbox = new GameObject("Phase1Sandbox");
-        var rig = sandbox.AddComponent<MolkkyRig>();
+        var root = new GameObject(rootName);
+        var rig = root.AddComponent<MolkkyRig>();
         rig.Bind(stick.GetComponent<Rigidbody>(), pinBodies, groundBox);
-        var sim = sandbox.AddComponent<ThrowSimulator>();
+        var sim = root.AddComponent<ThrowSimulator>();
         sim.Bind(rig);
-        var player = sandbox.AddComponent<ThrowPlayer>();
+        var player = root.AddComponent<ThrowPlayer>();
         player.Bind(rig);
-        var ui = sandbox.AddComponent<Phase1SandboxUI>();
-        ui.Bind(rig, sim, player, cam);
 
-        EditorSceneManager.SaveScene(scene, ScenePath);
-        EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
-        AssetDatabase.SaveAssets();
-        Debug.Log($"[Phase1SceneBuilder] Created {ScenePath}");
+        return new World { root = root, rig = rig, simulator = sim, player = player, camera = cam };
     }
 
     static GameObject CreateBody(string name, Mesh mesh, Material mat)

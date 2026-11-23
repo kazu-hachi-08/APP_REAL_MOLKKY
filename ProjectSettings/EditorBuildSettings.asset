@@ -6,7 +6,7 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/Phase0Check.unity
-    guid: b0521a1fd13744f44bfa74e02a0bedeb
+    path: Assets/Scenes/Phase1Sandbox.unity
+    guid: ed4ba14c9aa0d164f9bf1b455fce525b
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

@@ -15,6 +15,7 @@ namespace RealMolkky.DebugTools
     public class Phase2ThrowUI : MonoBehaviour
     {
         public const string SandboxScene = "Phase1Sandbox";
+        public const string MatchScene = "Phase3Match";
 
         [SerializeField] MolkkyRig rig;
         [SerializeField] ThrowSimulator simulator;
@@ -226,7 +227,10 @@ namespace RealMolkky.DebugTools
             if (GUILayout.Button(_showLabels ? "Labels: on" : "Labels: off", _button, GUILayout.Height(30))) _showLabels = !_showLabels;
             if (GUILayout.Button(_showDebug ? "Debug: on" : "Debug: off", _button, GUILayout.Height(30))) _showDebug = !_showDebug;
             GUILayout.EndHorizontal();
-            if (GUILayout.Button("Physics sandbox (Phase 1)", _button, GUILayout.Height(30))) SceneManager.LoadScene(SandboxScene);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Match (Phase 3)", _button, GUILayout.Height(30))) SceneManager.LoadScene(MatchScene);
+            if (GUILayout.Button("Physics (Phase 1)", _button, GUILayout.Height(30))) SceneManager.LoadScene(SandboxScene);
+            GUILayout.EndHorizontal();
             GUILayout.EndVertical();
             GUILayout.EndArea();
         }

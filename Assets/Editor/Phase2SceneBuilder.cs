@@ -39,7 +39,7 @@ public static class Phase2SceneBuilder
     /// <summary>ビルドに入れるシーン。最初のシーンが起動時に開く</summary>
     public static void ApplyBuildScenes()
     {
-        EditorBuildSettings.scenes = new[] { ScenePath, Phase1SceneBuilder.ScenePath }
+        EditorBuildSettings.scenes = new[] { Phase3SceneBuilder.ScenePath, ScenePath, Phase1SceneBuilder.ScenePath }
             .Where(File.Exists)
             .Select(p => new EditorBuildSettingsScene(p, true))
             .ToArray();

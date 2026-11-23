@@ -30,6 +30,15 @@ namespace RealMolkky.Play
         [SerializeField] ThrowSimulator simulator;
         [SerializeField] ThrowCamera throwCamera;
 
+        /// <summary>止まった後、一定時間で自動的に次の投げに進む（試合では false にして <see cref="BeginNextThrow"/> を呼ぶ）</summary>
+        [NonSerialized] public bool autoAdvance = true;
+
+        /// <summary>スワイプ・立ち位置・縦横の操作を受け付けるか（試合の設定画面などでは止める）</summary>
+        public bool InputEnabled { get; set; } = true;
+
+        /// <summary>R キーでピンを並べ直せるか（調整用）</summary>
+        [NonSerialized] public bool allowResetKey = true;
+
         public State CurrentState { get; private set; } = State.Aiming;
         public ThrowStyle Style { get; private set; } = ThrowStyle.Vertical;
         public float Lateral { get; private set; }
@@ -94,6 +103,14 @@ namespace RealMolkky.Play
             EnterAiming();
         }
 
+        /// <summary>止まった後に次の投げの準備に進む（<see cref="autoAdvance"/> が false のとき用）</summary>
+        public void BeginNextThrow()
+        {
+            _tracker.Cancel();
+            _trackingPointer = null;
+            EnterAiming();
+        }
+
         public void ToggleStyle() => SetStyle(Style == ThrowStyle.Vertical ? ThrowStyle.Horizontal : ThrowStyle.Vertical);
 
         public void SetStyle(ThrowStyle style)
@@ -105,7 +122,7 @@ namespace RealMolkky.Play
         /// <summary>立ち位置を動かす（-1 = 左, +1 = 右）。投げる準備中だけ</summary>
         public void MoveStance(float direction, float deltaTime)
         {
-            if (CurrentState != State.Aiming || IsDragging) return;
+            if (!InputEnabled || CurrentState != State.Aiming || IsDragging) return;
             SetLateral(Lateral + direction * tuning.stanceMoveSpeed * deltaTime);
         }
 
@@ -149,8 +166,8 @@ namespace RealMolkky.Play
             if (CurrentState == State.Settled)
             {
                 _settledTimer += Time.deltaTime;
-                // 倒れたピンはそのまま。次の投げに進む（立て直しはフェーズ3）
-                if (_settledTimer >= tuning.resultHoldTime) EnterAiming();
+                // 倒れたピンはそのまま次の投げに進む（試合では MatchController が立て直してから進める）
+                if (autoAdvance && _settledTimer >= tuning.resultHoldTime) EnterAiming();
             }
         }
 
@@ -162,8 +179,9 @@ namespace RealMolkky.Play
             if (kb.leftArrowKey.isPressed || kb.aKey.isPressed) dir -= 1f;
             if (kb.rightArrowKey.isPressed || kb.dKey.isPressed) dir += 1f;
             if (dir != 0f) MoveStance(dir, Time.deltaTime);
+            if (!InputEnabled) return;
             if (kb.spaceKey.wasPressedThisFrame) ToggleStyle();
-            if (kb.rKey.wasPressedThisFrame) ResetPins();
+            if (allowResetKey && kb.rKey.wasPressedThisFrame) ResetPins();
         }
 
         void HandlePointer()
@@ -185,7 +203,7 @@ namespace RealMolkky.Play
 
             if (!_tracker.IsTracking)
             {
-                if (press.wasPressedThisFrame && CurrentState == State.Aiming && !(IsOverUI?.Invoke(pos) ?? false))
+                if (press.wasPressedThisFrame && InputEnabled && CurrentState == State.Aiming && !(IsOverUI?.Invoke(pos) ?? false))
                 {
                     _tracker.Begin(now, pos);
                     _trackingPointer = pointer;
@@ -214,12 +232,21 @@ namespace RealMolkky.Play
             LastSwipeVelocity = vel;
             LastSwipeStroke = stroke;
             LastReject = SwipeThrowMapper.TryMap(vel, stroke, Style, Lateral, tuning, out var p);
-            if (LastReject != SwipeReject.None || CurrentState != State.Aiming) return;
+            if (LastReject != SwipeReject.None || !InputEnabled) return;
+            Throw(p);
+        }
 
+        /// <summary>決まった条件で投げる（スワイプから、またはテスト用）。投げる準備中でなければ何もしない</summary>
+        public bool Throw(in ThrowParams p)
+        {
+            if (CurrentState != State.Aiming) return false;
+            _tracker.Cancel();
+            _trackingPointer = null;
             LastParams = p;
             ThrowCount++;
             CurrentState = State.Flying;
             simulator.Throw(p);
+            return true;
         }
     }
 }

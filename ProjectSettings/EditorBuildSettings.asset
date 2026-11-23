@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/Phase3Match.unity
+    guid: df9c36d73db2af747b7c0c8aec666239
+  - enabled: 1
     path: Assets/Scenes/Phase2Throw.unity
     guid: 1ca554c101d467a47ae0a6a16f8e5c94
   - enabled: 1

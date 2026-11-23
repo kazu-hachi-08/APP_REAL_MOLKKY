@@ -99,6 +99,38 @@ namespace RealMolkky.Tests
 
         [TestCase(ThrowStyle.Vertical)]
         [TestCase(ThrowStyle.Horizontal)]
+        public void RestoodPins_StayStanding(ThrowStyle style)
+        {
+            var p = ThrowParams.Default;
+            p.style = style;
+            _sim.Throw(p);
+            _sim.RunToEnd();
+            Assume.That(_sim.LastFallenPins.Count, Is.GreaterThan(0));
+
+            _rig.GroundArea(out var area, out float groundY);
+            var pos = new Vector3[MolkkySpec.PinCount];
+            var rot = new Quaternion[MolkkySpec.PinCount];
+            PinRestand.FromRecord(_sim.LastRecord, area, groundY, pos, rot);
+            _rig.PlacePins(pos, rot);
+
+            // 眠らせずに2秒進めても、倒れず・ずれない
+            for (int i = 1; i <= MolkkySpec.PinCount; i++) _rig.GetBody(i).WakeUp();
+            float dt = _rig.tuning.fixedDeltaTime;
+            for (int s = 0; s < Mathf.RoundToInt(2f / dt); s++)
+            {
+                _rig.PreStep(dt);
+                Physics.Simulate(dt);
+            }
+            for (int n = 1; n <= MolkkySpec.PinCount; n++)
+            {
+                var tr = _rig.GetBody(n).transform;
+                Assert.Less(MolkkySpec.PinTiltDeg(tr.rotation), 2f, $"pin {n} tilted");
+                Assert.Less(Vector3.Distance(tr.position, pos[n - 1]), 0.005f, $"pin {n} moved");
+            }
+        }
+
+        [TestCase(ThrowStyle.Vertical)]
+        [TestCase(ThrowStyle.Horizontal)]
         public void DefaultThrow_StopsAndHitsPins(ThrowStyle style)
         {
             var p = ThrowParams.Default;

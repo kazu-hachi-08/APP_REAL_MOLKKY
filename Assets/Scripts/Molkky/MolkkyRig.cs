@@ -118,6 +118,26 @@ namespace RealMolkky.Molkky
             for (int n = 1; n <= MolkkySpec.PinCount; n++) _bodies[n].Sleep();
         }
 
+        /// <summary>ピンを指定の姿勢に置き直す（立て直し用）。配列の [0] = 1番。棒は手元に戻す</summary>
+        public void PlacePins(Vector3[] positions, Quaternion[] rotations)
+        {
+            for (int n = 1; n <= MolkkySpec.PinCount; n++)
+            {
+                SetDynamicPose(_bodies[n], positions[n - 1], rotations[n - 1]);
+            }
+            HoldStick(new Vector3(0f, 0.6f, 0.2f), Quaternion.identity);
+            Physics.SyncTransforms();
+            for (int n = 1; n <= MolkkySpec.PinCount; n++) _bodies[n].Sleep();
+        }
+
+        /// <summary>地面の上面の範囲（x, z）と高さ</summary>
+        public void GroundArea(out Rect xz, out float topY)
+        {
+            var b = ground.bounds;
+            xz = Rect.MinMaxRect(b.min.x, b.min.z, b.max.x, b.max.z);
+            topY = b.max.y;
+        }
+
         /// <summary>投げる前の棒を空中に固定する</summary>
         public void HoldStick(Vector3 position, Quaternion rotation)
         {
